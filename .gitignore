@@ -1,0 +1,29 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Variables de entorno y secretos
+.env
+.env.*
+
+# Excepciones: permitir plantillas sin secretos
+!.env.example
+
+# Pruebas y herramientas
+.pytest_cache/
+.coverage
+.mypy_cache/
+
+# Editores
+.vscode/
+.idea/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
