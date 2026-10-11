@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .models.models import db, Blacklist
 
-# Carga las variables de entorno desde un archivo .env.
+# Carga las variables de entorno .env
 load_dotenv()
 
 # Inicializa la aplicación Flask y su API REST.
@@ -22,28 +22,28 @@ app = Flask(__name__)
 api = Api(app)
 
 # ELIMINAR ESTA LINEA EN PRODUCCION
-# Configuración de la expiración de tokens JWT. Se desactiva la expiración para pruebas.
+# Configuración de la expiración de tokens JWT. Se desactiva la expiración para pruebas
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
 
-# Configuración de la base de datos y autenticación JWT.
+# Configuración de la base de datos y autenticación JWT
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
 
-# Conecta SQLAlchemy a la aplicación y habilita JWT.
+# Conecta SQLAlchemy a la aplicación y habilita JWT
 db.init_app(app)
 jwt = JWTManager(app)
 
 
-# Define la validación esperada para crear un registro de bloqueo.
+# Esquema de validación para la entrada de datos al registrar un correo en la lista negra
 class BlacklistInput(Schema):
-    # Email válido requerido para identificar al usuario afectado.
+    # El correo electrónico debe ser válido y no puede estar vacío
     email = fields.Email(required=True)
 
-    # UUID de la aplicación que reporta el bloqueo.
+    # El UUID de la aplicación que emite el bloqueo debe ser un UUID válido
     app_uuid = fields.UUID(required=True)
 
-    # Motivo opcional del bloqueo, con longitud máxima de 255 caracteres.
+    # El motivo del bloqueo es opcional y puede ser nulo
     blocked_reason = fields.String(
         required=False,
         allow_none=True,
@@ -51,27 +51,26 @@ class BlacklistInput(Schema):
     )
 
 
-# Endpoint para registrar un correo en la lista negra.
+# Endpoint para registrar un correo en la lista negra
 class Blacklists(Resource):
-    # Cada solicitud requiere autenticación JWT.
+    # La creación de un registro en la lista negra requiere autenticación JWT
     @jwt_required()
     def post(self):
         try:
-            # Valida y convierte los datos JSON recibidos.
+            # Valida y deserializa la entrada JSON usando el esquema definido
             data = BlacklistInput().load(request.get_json() or {})
         except ValidationError as error:
             return {"message": "Datos inválidos", "errors": error.messages}, 400
 
-        # Normaliza el email para evitar duplicados por mayúsculas o espacios.
+        # Normaliza el email para evitar duplicados por mayúsculas o espacios
         email = data["email"].strip().lower()
         app_uuid = str(data["app_uuid"])
         reason = data.get("blocked_reason")
 
-        # Detrás del proxy de AWS debe configurarse
-        # correctamente la confianza en los encabezados reenviados.
+        # Obtiene la dirección IP del cliente que realiza la solicitud; si no está disponible, se asigna "unknown"
         ip_address = request.remote_addr or "unknown"
 
-        # Crea el registro nuevo en la base de datos.
+        # Crea el registro nuevo en la base de datos
         record = Blacklist(
             email=email,
             app_uuid=app_uuid,
@@ -94,12 +93,14 @@ class Blacklists(Resource):
         }, 201
 
 
-# Endpoint para consultar si un correo está bloqueado.
+# Endpoint para consultar si un correo está bloqueado
 class BlacklistByEmail(Resource):
-    # La consulta también requiere autenticación.
+
+    # La consulta también requiere autenticación
     @jwt_required()
     def get(self, email):
-        # Normaliza el email como en la creación para comparar correctamente.
+
+        # Normaliza el email como en la creación para comparar correctamente
         email = email.strip().lower()
         record = db.session.query(Blacklist).filter_by(
             email=email
@@ -116,19 +117,19 @@ api.add_resource(Blacklists, "/blacklists")
 api.add_resource(BlacklistByEmail, "/blacklists/<string:email>")
 
 
-# Endpoint de salud para verificar que el servicio está funcionando.
+# Endpoint de salud para verificar que el servicio está funcionando
 @app.get("/")
 def health():
     return jsonify({"status": "ok", "service": "blacklist-microservice"})
 
 
-# Respuesta estándar para rutas inexistentes.
+# Respuesta estándar para rutas inexistentes
 @app.errorhandler(404)
 def not_found(_error):
     return jsonify({"message": "Recurso no encontrado"}), 404
 
 
-# Inicia el servidor solo cuando se ejecuta directamente este archivo.
+# Inicia el servidor solo cuando se ejecuta directamente este archivo
 if __name__ == "__main__":
     with app.app_context():
         # Crea las tablas necesarias si aún no existen.
