@@ -1,3 +1,4 @@
+import socket
 
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource
@@ -156,11 +157,6 @@ def health():
 @app.errorhandler(404)
 def not_found(_error):
     return jsonify({"message": "Recurso no encontrado"}), 404
-
-
-# Crea las tablas si no existen (local y Elastic Beanstalk / gunicorn)
-with app.app_context():
-    db.create_all()
 
 
 # Inicia el servidor solo cuando se ejecuta directamente este archivo
