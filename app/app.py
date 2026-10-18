@@ -6,18 +6,29 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from marshmallow import Schema, fields, validate, ValidationError
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import get_database_url, get_jwt_secret_key
 from .models.models import db, Blacklist
+
+# Versión desplegada. Se incrementa en cada despliegue para validar las estrategias en Beanstalk
+APP_VERSION = "1.0.0"
 
 # Inicializa la aplicación Flask y su API REST.
 app = Flask(__name__)
 api = Api(app)
 
-# ELIMINAR ESTA LINEA EN PRODUCCION
-# Configuración de la expiración de tokens JWT. Se desactiva la expiración para pruebas
+# En Beanstalk la petición pasa por el balanceador (ALB) y por nginx, cada uno agrega
+# una entrada en X-Forwarded-For. Se confía en esos dos saltos para obtener la IP real del cliente
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2)
+
+# El enunciado permite un token estático para toda la aplicación, por eso no expira
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
+
+# Sin esto Flask-RESTful captura los errores de JWT y responde 500 en lugar de 401/422
+app.config["PROPAGATE_EXCEPTIONS"] = True
 
 # Local: DATABASE_URL desde .env | AWS: credenciales desde Secrets Manager (DB_SECRET_ARN)
 app.config["SQLALCHEMY_DATABASE_URI"] = get_database_url()
@@ -27,6 +38,14 @@ app.config["JWT_SECRET_KEY"] = get_jwt_secret_key()
 # Conecta SQLAlchemy a la aplicación y habilita JWT
 db.init_app(app)
 jwt = JWTManager(app)
+
+# Crea las tablas al iniciar (también bajo gunicorn en Beanstalk). Varias instancias pueden
+# arrancar a la vez, así que si otra ya creó la tabla se ignora el error
+with app.app_context():
+    try:
+        db.create_all()
+    except SQLAlchemyError:
+        db.session.rollback()
 
 
 # Esquema de validación para la entrada de datos al registrar un correo en la lista negra
@@ -111,10 +130,26 @@ api.add_resource(Blacklists, "/blacklists")
 api.add_resource(BlacklistByEmail, "/blacklists/<string:email>")
 
 
-# Endpoint de salud para verificar que el servicio está funcionando
+# Endpoint raíz: muestra la versión y la instancia que atendió la solicitud
 @app.get("/")
+def index():
+    return jsonify({
+        "status": "ok",
+        "service": "blacklist-microservice",
+        "version": APP_VERSION,
+        "instance": socket.gethostname(),
+    })
+
+
+# Endpoint usado por el health check de Beanstalk: también verifica la conexión a RDS
+@app.get("/health")
 def health():
-    return jsonify({"status": "ok", "service": "blacklist-microservice"})
+    try:
+        db.session.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({"status": "error", "database": "unreachable"}), 503
+    return jsonify({"status": "ok", "database": "ok", "version": APP_VERSION})
 
 
 # Respuesta estándar para rutas inexistentes

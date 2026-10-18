@@ -1,1 +1,1 @@
-web: gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 15 app.app:app
+web: gunicorn --bind 127.0.0.1:8000 --workers 3 --access-logfile - application:application
