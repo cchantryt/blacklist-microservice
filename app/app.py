@@ -1,8 +1,4 @@
 
-import os
-from uuid import UUID
-
-from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource
 from flask_jwt_extended import (
@@ -12,10 +8,8 @@ from flask_jwt_extended import (
 from marshmallow import Schema, fields, validate, ValidationError
 from sqlalchemy.exc import IntegrityError
 
+from .config import get_database_url, get_jwt_secret_key
 from .models.models import db, Blacklist
-
-# Carga las variables de entorno .env
-load_dotenv()
 
 # Inicializa la aplicación Flask y su API REST.
 app = Flask(__name__)
@@ -25,10 +19,10 @@ api = Api(app)
 # Configuración de la expiración de tokens JWT. Se desactiva la expiración para pruebas
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
 
-# Configuración de la base de datos y autenticación JWT
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
+# Local: DATABASE_URL desde .env | AWS: credenciales desde Secrets Manager (DB_SECRET_ARN)
+app.config["SQLALCHEMY_DATABASE_URI"] = get_database_url()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
+app.config["JWT_SECRET_KEY"] = get_jwt_secret_key()
 
 # Conecta SQLAlchemy a la aplicación y habilita JWT
 db.init_app(app)
@@ -129,10 +123,12 @@ def not_found(_error):
     return jsonify({"message": "Recurso no encontrado"}), 404
 
 
+# Crea las tablas si no existen (local y Elastic Beanstalk / gunicorn)
+with app.app_context():
+    db.create_all()
+
+
 # Inicia el servidor solo cuando se ejecuta directamente este archivo
 if __name__ == "__main__":
-    with app.app_context():
-        # Crea las tablas necesarias si aún no existen.
-        db.create_all()
-
     app.run(host="127.0.0.1", port=5000, debug=True)
+

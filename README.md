@@ -70,17 +70,37 @@ http://127.0.0.1:5000/
 
 La primera ejecución crea las tablas si la aplicación tiene configurado `db.create_all()`.
 
+> **Nota sobre el Procfile:**  
+> Se ha incluido un archivo `Procfile` en la raíz del microservicio para facilitar el despliegue en servidores que usen Gunicorn (como AWS Elastic Beanstalk).  
+> El comando especificado en el `Procfile` es:  
+> ```
+> web: gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 15 app.app:app
+> ```  
+> Esto permite levantar la aplicación con Gunicorn en puerto 8000, lo cual es habitual en producción o contenedores.  
+> Para desarrollo local, basta con ejecutar el comando `python -m app.app` como se indica arriba.
+
 ## 7. Generar un token JWT
 
-Con el entorno virtual activado y desde la raíz:
+El token se firma con `JWT_SECRET_KEY`. No hace falta generarlo dentro de Beanstalk: si lo firmas localmente con la misma clave de producción, la API desplegada lo aceptará.
+
+### Local (usa `.env`)
 
 ```powershell
 python -c "from app.app import app; from flask_jwt_extended import create_access_token; app.app_context().push(); print(create_access_token(identity='postman-client'))"
 ```
 
-Puede ser necesario desctivar Smart app control en windows para generar la key JWT, luego de tenerla, se puede volver a activar.
+### Contra la API en Elastic Beanstalk
+
+Con credenciales AWS que puedan leer el secreto JWT:
+
+```powershell
+$env:JWT_SECRET_ARN = "arn:aws:secretsmanager:us-east-1:ACCOUNT:secret:prod/blacklist/jwt-XXXXXX"
+python -c "from app.config import get_jwt_secret_key; from flask import Flask; from flask_jwt_extended import JWTManager, create_access_token; a=Flask(__name__); a.config['JWT_SECRET_KEY']=get_jwt_secret_key(); a.config['JWT_ACCESS_TOKEN_EXPIRES']=False; JWTManager(a); a.app_context().push(); print(create_access_token(identity='postman-client'))"
+```
 
 Copiar el token generado para utilizarlo en Postman.
+
+Puede ser necesario desactivar Smart App Control en Windows al generar el token; luego se puede volver a activar.
 
 ## 8. Probar los endpoints en Postman
 
