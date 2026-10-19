@@ -1,0 +1,10 @@
+# Archivos que no se incluyen en el paquete que se sube a Elastic Beanstalk
+.git/
+.venv/
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+postman/
+*.zip
