@@ -128,6 +128,24 @@ Se espera una respuesta JSON que indique si el correo está en la lista negra y 
 
 También se puede importar la colección de Postman incluida en la carpeta `postman/` y configurar la variable `baseURL`.
 
+## 10. Ejecutar las pruebas unitarias
+
+Las pruebas automatizadas cubren al menos un escenario para cada endpoint:
+
+- `GET /`
+- `GET /health`
+- `POST /blacklists`
+- `GET /blacklists/<email>`
+- Respuesta `404` para rutas inexistentes
+
+Se usa una base de datos SQLite en memoria, por lo que las pruebas no necesitan PostgreSQL ni modifican datos locales. Para ejecutarlas:
+
+```powershell
+.\venv\Scripts\python.exe -m pytest tests -q
+```
+
+El resultado esperado es que todos los escenarios finalicen correctamente.
+
 ## Notas
 
 - No subir los archivos `.env`, secretos ni la carpeta `venv/` a GitHub.
