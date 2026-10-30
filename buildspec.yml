@@ -1,4 +1,4 @@
-# Especificación de construcción para AWS CodeBuild (Entrega 2 - Integración Continua).
+﻿# Especificación de construcción para AWS CodeBuild (Entrega 2 - Integración Continua).
 # 1. Instala dependencias  2. Ejecuta las pruebas unitarias  3. Genera el artefacto para Beanstalk.
 # Si alguna prueba falla, la fase build falla y no se genera el artefacto.
 # Solo se genera el artefacto: el despliegue (CD) no hace parte de esta entrega.
@@ -11,6 +11,7 @@ phases:
       python: 3.12
     commands:
       - python --version
+      - python -c "import sqlite3; print('SQLite disponible:', sqlite3.sqlite_version)"
       - python -m pip install --upgrade pip
       - python -m pip install -r requirements-dev.txt
 
