@@ -7,9 +7,9 @@ version: 0.2
 
 phases:
   install:
-    runtime-versions:
-      python: 3.12
     commands:
+      - pyenv versions
+      - pyenv global 3.12
       - python --version
       - python -c "import sqlite3; print('SQLite disponible:', sqlite3.sqlite_version)"
       - python -m pip install --upgrade pip
@@ -30,7 +30,6 @@ phases:
 
   post_build:
     commands:
-      # post_build se ejecuta aunque build falle; solo informa el resultado en los logs
       - |
         if [ "$CODEBUILD_BUILD_SUCCEEDING" = "1" ]; then
           echo "Pruebas exitosas. Generando artefacto de despliegue."
@@ -38,20 +37,19 @@ phases:
           echo "Las pruebas fallaron. El build queda en estado FAILED."
         fi
 
-# Reportes visibles en la pestaña "Reports" del proyecto de CodeBuild
 reports:
   blacklist-unit-tests:
     files:
       - junit.xml
     base-directory: reports
     file-format: JUNITXML
+
   blacklist-coverage:
     files:
       - coverage.xml
     base-directory: reports
     file-format: COBERTURAXML
 
-# Artefacto (zip) listo para subir a Elastic Beanstalk. CodeBuild/CodePipeline lo guarda en S3
 artifacts:
   name: blacklist-microservice-$CODEBUILD_BUILD_NUMBER.zip
   files:
