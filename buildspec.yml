@@ -8,6 +8,7 @@ version: 0.2
 phases:
   install:
     commands:
+      - export HOME=/root
       - pyenv versions
       - pyenv global 3.12
       - python --version
