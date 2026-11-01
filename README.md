@@ -1,6 +1,6 @@
 # Blacklist Microservice
 
-Microservicio REST desarrollado en Python con Flask y PostgreSQL para registrar y consultar correos electrónicos en una lista negra. La aplicación usa JWT para proteger los endpoints de la lista y puede desplegarse en AWS Elastic Beanstalk. Las pruebas unitarias viven en `tests/` y `buildspec.yml` las ejecuta en AWS CodeBuild antes de generar el artefacto de despliegue. 
+Microservicio REST desarrollado en Python con Flask y PostgreSQL para registrar y consultar correos electrónicos en una lista negra. La aplicación usa JWT para proteger los endpoints de la lista y puede desplegarse en AWS Elastic Beanstalk. Las pruebas unitarias viven en `tests/` y `buildspec.yml` las ejecuta en AWS CodeBuild antes de generar el artefacto de despliegue.
 
 ## 1. Requisitos previos
 
