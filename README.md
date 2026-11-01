@@ -1,13 +1,13 @@
 # Blacklist Microservice
 
-Microservicio REST desarrollado en Python con Flask y PostgreSQL para registrar y consultar correos electrónicos en una lista negra. La aplicación usa JWT para proteger los endpoints de la lista y puede desplegarse en AWS Elastic Beanstalk.
+Microservicio REST desarrollado en Python con Flask y PostgreSQL para registrar y consultar correos electrónicos en una lista negra. La aplicación usa JWT para proteger los endpoints de la lista y puede desplegarse en AWS Elastic Beanstalk. Las pruebas unitarias viven en `tests/` y `buildspec.yml` las ejecuta en AWS CodeBuild antes de generar el artefacto de despliegue.
 
 ## 1. Requisitos previos
 
 Instalar y tener disponible:
 
-- Python 3.11 o una versión compatible.
-- PostgreSQL.
+- Python 3.12. `buildspec.yml` selecciona esa versión en CodeBuild.
+- PostgreSQL, solo para ejecutar la API en local. Las pruebas usan SQLite en memoria.
 - Git.
 - Postman.
 
@@ -35,10 +35,16 @@ Si PowerShell bloquea la activación, se puede usar directamente el ejecutable d
 
 ## 4. Instalar las dependencias
 
-Con el entorno virtual activado:
+Con el entorno virtual activado, las dependencias de ejecución (las mismas que usa Beanstalk):
 
 ```powershell
 python -m pip install -r requirements.txt
+```
+
+Para ejecutar las pruebas, localmente o en CodeBuild, instalar también las de desarrollo. Ese archivo incluye `requirements.txt`, `pytest` y `pytest-cov`, y no entra en el artefacto de Beanstalk:
+
+```powershell
+python -m pip install -r requirements-dev.txt
 ```
 
 ## 5. Configurar el entorno local
@@ -130,24 +136,44 @@ También se puede importar la colección de Postman incluida en la carpeta `post
 
 ## 10. Ejecutar las pruebas unitarias
 
-Las pruebas automatizadas cubren al menos un escenario para cada endpoint:
+Instalar antes `requirements-dev.txt`. `pytest` no está en `requirements.txt`.
 
-- `GET /`
-- `GET /health`
-- `POST /blacklists`
-- `GET /blacklists/<email>`
-- Respuesta `404` para rutas inexistentes
+`tests/conftest.py` deja el entorno aislado: fija `DATABASE_URL` a SQLite en memoria, define una clave JWT de prueba y retira `DB_SECRET_ARN` y `JWT_SECRET_ARN` para que las pruebas no llamen a Secrets Manager. Cada prueba crea y borra sus tablas. No hace falta PostgreSQL ni un archivo `.env`.
 
-Se usa una base de datos SQLite en memoria, por lo que las pruebas no necesitan PostgreSQL ni modifican datos locales. Para ejecutarlas:
+Los escenarios de `tests/test_app.py` cubren:
+
+- `GET /`: estado, nombre del servicio, versión e instancia.
+- `GET /health`: base de datos disponible y respuesta `503` si no se puede consultar.
+- `POST /blacklists`: alta `201`, IP y fecha de creación, `401` sin token, `400` por email, `app_uuid` o `blocked_reason` de más de 255 caracteres, y `409` si el correo ya existe aunque cambie el uso de mayúsculas.
+- `GET /blacklists/<email>`: correo bloqueado, correo ausente (`blacklisted` en falso) y `401` sin token.
+- `404` en una ruta que no existe.
+
+Para ejecutarlas:
 
 ```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\venv\Scripts\python.exe -m pytest tests -q
 ```
 
-El resultado esperado es que todos los escenarios finalicen correctamente.
+El resultado esperado es que todos los escenarios finalicen correctamente. CodeBuild usa el mismo conjunto con reporte JUnit y cobertura:
+
+```powershell
+.\venv\Scripts\python.exe -m pytest tests -v --junitxml=reports/junit.xml --cov=app --cov-report=term --cov-report=xml:reports/coverage.xml
+```
+
+## 11. Integración continua en AWS CodeBuild
+
+`buildspec.yml` describe la compilación. No despliega la aplicación: el archivo termina cuando las pruebas pasan y queda definido el zip para Elastic Beanstalk.
+
+1. **install.** Selecciona Python 3.12 con pyenv, comprueba que SQLite está disponible e instala `requirements-dev.txt`.
+2. **pre_build.** Crea la carpeta `reports/`.
+3. **build.** Ejecuta `pytest` sobre `tests/`. Si una prueba falla, esta fase termina con error y CodeBuild marca la compilación como FAILED.
+4. **post_build.** Escribe en el log si las pruebas pasaron o fallaron.
+5. **reports.** Publica `reports/junit.xml` (JUnit) y `reports/coverage.xml` (Cobertura).
+6. **artifacts.** El zip incluye `application.py`, `Procfile`, `requirements.txt`, `app/**/*` y `.ebextensions/**/*`. Excluye `__pycache__` y `.pyc`. No incluye `tests/`, `requirements-dev.txt` ni `.env`.
 
 ## Notas
 
 - No subir los archivos `.env`, secretos ni la carpeta `venv/` a GitHub.
 - Cada integrante debe configurar su propia base de datos y sus variables de entorno.
-- Si aparece un error de PostgreSQL o de sus controladores, revisar la instalación local antes de probar los endpoints.
+- Si aparece un error de PostgreSQL o de sus controladores, revisar la instalación local antes de probar los endpoints. Las pruebas unitarias no usan PostgreSQL.
