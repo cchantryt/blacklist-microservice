@@ -1,0 +1,64 @@
+﻿# Especificación de construcción para AWS CodeBuild (Entrega 2 - Integración Continua).
+# 1. Instala dependencias  2. Ejecuta las pruebas unitarias  3. Genera el artefacto para Beanstalk.
+# Si alguna prueba falla, la fase build falla y no se genera el artefacto.
+# Solo se genera el artefacto: el despliegue (CD) no hace parte de esta entrega.
+# Las pruebas usan SQLite en memoria (ver tests/conftest.py): no necesitan PostgreSQL ni Secrets Manager.
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - export HOME=/root
+      - pyenv versions
+      - pyenv global 3.12
+      - python --version
+      - python -c "import sqlite3; print('SQLite disponible:', sqlite3.sqlite_version)"
+      - python -m pip install --upgrade pip
+      - python -m pip install -r requirements-dev.txt
+
+  pre_build:
+    commands:
+      - echo "Commit $CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - mkdir -p reports
+
+  build:
+    commands:
+      - echo "Ejecutando pruebas unitarias..."
+      - >-
+        python -m pytest tests -v
+        --junitxml=reports/junit.xml
+        --cov=app --cov-report=term --cov-report=xml:reports/coverage.xml
+
+  post_build:
+    commands:
+      - |
+        if [ "$CODEBUILD_BUILD_SUCCEEDING" = "1" ]; then
+          echo "Pruebas exitosas. Generando artefacto de despliegue."
+        else
+          echo "Las pruebas fallaron. El build queda en estado FAILED."
+        fi
+
+reports:
+  blacklist-unit-tests:
+    files:
+      - junit.xml
+    base-directory: reports
+    file-format: JUNITXML
+
+  blacklist-coverage:
+    files:
+      - coverage.xml
+    base-directory: reports
+    file-format: COBERTURAXML
+
+artifacts:
+  name: blacklist-microservice-$CODEBUILD_BUILD_NUMBER.zip
+  files:
+    - application.py
+    - Procfile
+    - requirements.txt
+    - app/**/*
+    - .ebextensions/**/*
+  exclude-paths:
+    - "**/__pycache__/**"
+    - "**/*.pyc"

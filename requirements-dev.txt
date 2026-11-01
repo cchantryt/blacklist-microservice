@@ -1,0 +1,4 @@
+# Dependencias para ejecutar las pruebas (local y AWS CodeBuild). No se despliegan en Beanstalk
+-r requirements.txt
+pytest==8.4.2
+pytest-cov==7.0.0
