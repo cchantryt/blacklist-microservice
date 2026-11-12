@@ -8,16 +8,17 @@ load_dotenv()
 
 
 def _resolve_aws_region(secret_arn: str) -> str:
-    """Región desde env, ARN, o us-east-1 por defecto."""
-    region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
-    if region:
-        return region
-
+    """Prioriza la región del ARN del secreto."""
     parts = secret_arn.split(":")
+
     if len(parts) >= 4 and parts[2] == "secretsmanager" and parts[3]:
         return parts[3]
 
-    return "us-east-1"
+    return (
+        os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-1"
+    )
 
 
 def _load_secret(secret_arn: str) -> dict | str:

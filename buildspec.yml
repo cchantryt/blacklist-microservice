@@ -39,6 +39,7 @@ phases:
           echo "Publicando imagen en Amazon ECR"
           docker push "$REPOSITORY_URI:$IMAGE_TAG"
           docker push "$REPOSITORY_URI:latest"
+          printf '{"ImageURI":"%s"}' "$REPOSITORY_URI:$IMAGE_TAG" > imageDetail.json
         else
           echo "La compilacion fallo. No se publica la imagen."
           exit 1
@@ -58,3 +59,9 @@ reports:
     file-format: COBERTURAXML
 
 
+artifacts:
+  files:
+    - appspec.yml
+    - taskdef.json
+    - imageDetail.json
+  discard-paths: yes
