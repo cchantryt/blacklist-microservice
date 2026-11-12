@@ -1,41 +1,47 @@
-﻿# Especificación de construcción para AWS CodeBuild (Entrega 2 - Integración Continua).
-# 1. Instala dependencias  2. Ejecuta las pruebas unitarias  3. Genera el artefacto para Beanstalk.
-# Si alguna prueba falla, la fase build falla y no se genera el artefacto.
-# Solo se genera el artefacto: el despliegue (CD) no hace parte de esta entrega.
-# Las pruebas usan SQLite en memoria (ver tests/conftest.py): no necesitan PostgreSQL ni Secrets Manager.
-version: 0.2
+﻿version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: us-east-2
+    AWS_ACCOUNT_ID: "104073949253"
+    IMAGE_REPO_NAME: blacklist-microservice
 
 phases:
   install:
+    runtime-versions:
+      python: 3.12
     commands:
-      - export HOME=/root
-      - pyenv versions
-      - pyenv global 3.12
       - python --version
-      - python -c "import sqlite3; print('SQLite disponible:', sqlite3.sqlite_version)"
-      - python -m pip install --upgrade pip
       - python -m pip install -r requirements-dev.txt
 
   pre_build:
     commands:
-      - echo "Commit $CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - echo "Iniciando pruebas unitarias"
       - mkdir -p reports
+      - echo "Autenticando Docker en Amazon ECR"
+      - AWS_ECR_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ECR_URI"
+      - REPOSITORY_URI="$AWS_ECR_URI/$IMAGE_REPO_NAME"
+      - IMAGE_TAG=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c 1-7)
 
   build:
     commands:
-      - echo "Ejecutando pruebas unitarias..."
-      - >-
-        python -m pytest tests -v
-        --junitxml=reports/junit.xml
-        --cov=app --cov-report=term --cov-report=xml:reports/coverage.xml
+      - echo "Ejecutando pruebas unitarias"
+      - python -m pytest tests -v --junitxml=reports/junit.xml --cov=app --cov-report=term --cov-report=xml:reports/coverage.xml
+      - echo "Construyendo imagen Docker"
+      - docker build -t "$REPOSITORY_URI:$IMAGE_TAG" .
+      - docker tag "$REPOSITORY_URI:$IMAGE_TAG" "$REPOSITORY_URI:latest"
 
   post_build:
     commands:
       - |
         if [ "$CODEBUILD_BUILD_SUCCEEDING" = "1" ]; then
-          echo "Pruebas exitosas. Generando artefacto de despliegue."
+          echo "Publicando imagen en Amazon ECR"
+          docker push "$REPOSITORY_URI:$IMAGE_TAG"
+          docker push "$REPOSITORY_URI:latest"
         else
-          echo "Las pruebas fallaron. El build queda en estado FAILED."
+          echo "La compilacion fallo. No se publica la imagen."
+          exit 1
         fi
 
 reports:
@@ -51,14 +57,4 @@ reports:
     base-directory: reports
     file-format: COBERTURAXML
 
-artifacts:
-  name: blacklist-microservice-$CODEBUILD_BUILD_NUMBER.zip
-  files:
-    - application.py
-    - Procfile
-    - requirements.txt
-    - app/**/*
-    - .ebextensions/**/*
-  exclude-paths:
-    - "**/__pycache__/**"
-    - "**/*.pyc"
+
