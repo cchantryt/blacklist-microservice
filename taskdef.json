@@ -7,8 +7,8 @@
   ],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::104073949253:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::104073949253:role/blacklistEcsTaskRole",
+  "executionRoleArn": "arn:aws:iam::196659290533:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::196659290533:role/blacklistEcsTaskRole",
   "containerDefinitions": [
     {
       "name": "blacklist-container",
@@ -24,11 +24,11 @@
       "environment": [
         {
           "name": "DB_SECRET_ARN",
-          "value": "arn:aws:secretsmanager:us-east-1:104073949253:secret:prod/blacklist/db-HlbDzI"
+          "value": "arn:aws:secretsmanager:us-east-2:196659290533:secret:blacklist/database-W0848O"
         },
         {
           "name": "JWT_SECRET_ARN",
-          "value": "arn:aws:secretsmanager:us-east-1:104073949253:secret:prod/blacklist/jwt_secret_key-B70eqE"
+          "value": "arn:aws:secretsmanager:us-east-2:196659290533:secret:blacklist/jwt-mUOGsl"
         }
       ],
       "logConfiguration": {
