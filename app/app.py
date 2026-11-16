@@ -104,7 +104,7 @@ class Blacklists(Resource):
         return {
             "message": "Correo agregado a la lista negra",
             "blacklisted": True,
-        }, 200
+        }, 201
 
 
 # Endpoint para consultar si un correo está bloqueado
